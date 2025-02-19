@@ -1,0 +1,85 @@
+specification {
+    element person {
+        style {
+            shape person
+            color green
+        }
+    }
+    element softwareSystem
+    element container
+    element component
+}
+
+model {
+  user = person "Пользователь" "Пользователь программы лояльности"
+
+  customerLoyalty = softwareSystem "Программа лояльности" {
+    apiGateway = container "API Gateway" {
+      description "Маршрутизация запросов и управление доступом"
+    }
+
+    userService = container "User Service" {
+      description "Управление пользователями и аутентификация"
+    }
+
+    promocodesService = container "Promocodes Service" {
+      description "Управление промокодами и комментариями"
+    }
+
+    analyticsService = container "Analytics Service" {
+      description "Сбор и анализ статистики использования"
+    }
+
+    postgresDb = container "PostgreSQL" {
+      description "Хранение данных пользователей"
+      technology "Database"
+      style {
+        shape cylinder
+      }
+    }
+
+    clickhouseDb = container "ClickhouseDB" {
+      description "Хранение статистики"
+      technology "Database"
+      style {
+        shape cylinder
+      }
+    }
+
+    cassandraDb = container "Cassandra" {
+      description "Хранение промокодов и комментариев"
+      technology "Database"
+      style {
+        shape cylinder
+      }
+    }
+
+    kafka = container "Kafka" {
+      description "Обмен событиями между сервисами"
+      technology "Message Broker"
+      style {
+        shape queue
+      }
+    }
+  }
+
+  user -> customerLoyalty.apiGateway "Использует" "HTTPS"
+
+  customerLoyalty.apiGateway -> customerLoyalty.userService "Маршрутизирует" "JSON/HTTPS"
+  customerLoyalty.apiGateway -> customerLoyalty.promocodesService "Маршрутизирует" "JSON/HTTPS"
+  customerLoyalty.apiGateway -> customerLoyalty.analyticsService "Маршрутизирует" "JSON/HTTPS"
+
+  customerLoyalty.userService -> customerLoyalty.postgresDb "Читает/Пишет" "SQL"
+  customerLoyalty.promocodesService -> customerLoyalty.cassandraDb "Читает/Пишет" "CQL"
+  customerLoyalty.analyticsService -> customerLoyalty.clickhouseDb "Читает/Пишет" "CQL"
+
+  customerLoyalty.promocodesService -> customerLoyalty.kafka "Передает данные для аналитики"
+
+  customerLoyalty.kafka -> customerLoyalty.analyticsService "Читает для аналитики"
+}
+
+views {
+   view index {
+        include *
+    }
+}
