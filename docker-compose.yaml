@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:13
+    environment:
+      POSTGRES_DB: test
+      POSTGRES_USER: test
+      POSTGRES_PASSWORD: test
+    ports:
+      - "5432:5432"
+  apigateway:
+    build: 
+      context: .
+      dockerfile: ./internal/apigateway/docker/Dockerfile
+    ports:
+      - "8080:8080"
+  userservice:
+    build: 
+      context: .
+      dockerfile: ./internal/userservice/docker/Dockerfile
+    ports:
+      - "1337:1337"

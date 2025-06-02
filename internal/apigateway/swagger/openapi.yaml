@@ -1,0 +1,219 @@
+openapi: "3.0.2"
+info:
+  title: APIGateway
+  version: "1.0"
+  description:
+   Apigateway
+  contact:
+    name: Laurence de Jong
+    url: https://ldej.nl/
+    email: info@ldej.nl
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
+servers:
+  - url: /api/v1
+paths:
+  /login:
+    post:
+      operationId: login
+      tags:
+        - userService
+      description: Login User
+      requestBody:
+        description: Login body
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /register:
+    post:
+      operationId: register
+      tags:
+        - userService
+      description: Register User
+      requestBody:
+        description: Register body
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegisterResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /profile:
+    get:
+      operationId: getProfile
+      tags:
+        - userService
+      description: Get user profile
+      parameters:
+        - name: jwt
+          description: User's jwt
+          in: cookie
+          schema:
+            type: string
+          required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetProfileResponse"
+        default:
+          $ref: "#/components/responses/Error"
+    post:
+      operationId: updateProfile
+      tags:
+        - userService
+      description: Update user profile
+      parameters:
+        - name: jwt
+          description: User's jwt
+          in: cookie
+          schema:
+            type: string
+          required: true
+      requestBody:
+        description: User's new data
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProfileRequest"
+      responses:
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                type: boolean
+        default:
+          $ref: "#/components/responses/Error"
+components:
+  responses:
+    Error:
+      description: Super Error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  schemas:
+    Error:
+      type: object
+      properties:
+        code:
+          type: string
+        message: 
+          type: string
+      required:
+        - message
+    LoginRequest:
+      type: object
+      properties:
+        login:
+          type: string
+          format: string
+        email:
+          type: string
+          format: string
+        password:
+          type: string
+          format: string
+      required:
+       - password
+    LoginResponse:
+      type: object
+      properties:
+        jwt:
+          type: string
+          format: string
+    RegisterRequest:
+      type: object
+      properties:
+        login:
+          type: string
+          format: string
+        email:
+          type: string
+          format: string
+        name:
+          type: string
+          format: string
+        surname:
+          type: string
+          format: string
+        mobile_number:
+          type: string
+          format: string
+        password:
+          type: string
+          format: string
+      required:
+       - login
+       - email
+       - password
+    RegisterResponse:
+      type: object
+      properties:
+        jwt:
+          type: string
+          format: string
+    GetProfileResponse:
+      type: object
+      properties:
+        login:
+          type: string
+          format: string
+        email:
+          type: string
+          format: string
+        name:
+          type: string
+          format: string
+        surname:
+          type: string
+          format: string
+        mobile_number:
+          type: string
+          format: string
+    UpdateProfileRequest:
+      type: object
+      properties:
+        password:
+          type: string
+          format: string
+        name:
+          type: string
+          format: string
+        surname:
+          type: string
+          format: string
+        mobile_number:
+          type: string
+          format: string
+      required:
+       - name
+       - surname
+       - mobile_number
+tags:
+  - name: userService
+    description: Service which logins and registers users

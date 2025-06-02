@@ -1,0 +1,75 @@
+syntax = "proto3";
+
+import "google/protobuf/timestamp.proto";
+
+package userservice;
+
+option go_package = "./pb";
+
+service Auth {
+    rpc Register(RegisterRequest) returns (RegisterResponse) {}
+    rpc Login(LoginRequest) returns (LoginResponse) {}
+    rpc Validate(ValidateRequest) returns (ValidateResponse) {}
+}
+
+message RegisterRequest {
+    optional string login = 1;
+    optional string password = 2;
+    optional string name = 3;
+    optional string surname = 4;
+    optional google.protobuf.Timestamp birthday = 5;
+    optional string email = 6;
+    optional string mobile_number = 7;
+}
+
+message RegisterResponse {
+}
+
+message LoginRequest {
+    optional string login = 1;
+    optional string password = 2;
+    optional string email = 3;
+}
+
+message LoginResponse {
+    optional string jwt = 1;
+}
+
+message ValidateRequest {
+    optional string jwt = 1;
+}
+
+message ValidateResponse {
+    optional bool valid = 1; // maybe change to status
+    optional string login = 2;
+}
+
+service Profile {
+    rpc GetProfile(GetProfileRequest) returns (GetProfileResponse) {}
+    rpc UpdateProfile(UpdateProfileRequest) returns (UpdateProfileResponse) {}
+}
+
+message GetProfileRequest {
+    optional string login = 1;
+}
+
+message GetProfileResponse {
+    optional string login = 1;
+    optional string email = 2;
+    optional string name = 3;
+    optional string surname = 4;
+    optional string mobile_number = 5;
+}
+
+message UpdateProfileRequest {
+    optional string login = 1; // login can't be changed
+    optional string password = 2;
+    optional string name = 3;
+    optional string surname = 4;
+    optional string mobile_number = 5;
+}
+
+message UpdateProfileResponse {
+
+}
+

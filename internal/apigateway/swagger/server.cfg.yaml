@@ -1,0 +1,6 @@
+package: apigateway
+generate:
+  embedded-spec: true
+  strict-server: true
+  models: true
+  gin-server: true
