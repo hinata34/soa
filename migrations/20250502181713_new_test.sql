@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS users (
     email text NOT NULL UNIQUE,
     mobile_number text NOT NULL DEFAULT '',
     created timestamp NOT NULL DEFAULT NOW(),
-    updated timestamp NOT NULL DEFAULT NOW(),
+    updated timestamp NOT NULL DEFAULT NOW()
 )
 -- +goose StatementEnd
 

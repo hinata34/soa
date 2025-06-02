@@ -23,7 +23,6 @@ message RegisterRequest {
 }
 
 message RegisterResponse {
-    optional uint64 status = 1;
 }
 
 message LoginRequest {
@@ -33,8 +32,7 @@ message LoginRequest {
 }
 
 message LoginResponse {
-    optional uint64 status = 1;
-    optional string jwt = 2;
+    optional string jwt = 1;
 }
 
 message ValidateRequest {
@@ -43,6 +41,7 @@ message ValidateRequest {
 
 message ValidateResponse {
     optional bool valid = 1; // maybe change to status
+    optional string login = 2;
 }
 
 service Profile {
@@ -51,15 +50,23 @@ service Profile {
 }
 
 message GetProfileRequest {
-
+    optional string login = 1;
 }
 
 message GetProfileResponse {
-
+    optional string login = 1;
+    optional string email = 2;
+    optional string name = 3;
+    optional string surname = 4;
+    optional string mobile_number = 5;
 }
 
 message UpdateProfileRequest {
-    
+    optional string login = 1; // login can't be changed
+    optional string password = 2;
+    optional string name = 3;
+    optional string surname = 4;
+    optional string mobile_number = 5;
 }
 
 message UpdateProfileResponse {

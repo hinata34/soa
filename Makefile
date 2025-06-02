@@ -12,3 +12,10 @@ migration_up:
 
 migration_down:
 	goose -dir ./migrations postgres "postgresql://test:test@127.0.0.1:5432/test?sslmode=disable" down
+
+generate_openapi:
+	oapi-codegen -config ./internal/apigateway/swagger/server.cfg.yaml -o ./internal/apigateway/swagger/server.gen.go internal/apigateway/swagger/openapi.yaml
+
+.PHONY: start
+start:
+	docker compose build && docker compose up

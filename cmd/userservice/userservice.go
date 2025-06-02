@@ -18,18 +18,18 @@ import (
 func main() {
 	ctx := context.Background()
 
-	database := db.NewDB(ctx, "")
+	database := db.NewDB(ctx, "postgres://test:test@postgres:5432/test")
 	authDatabase := postgresqlAuth.NewAuthRepoPostgresql(database)
 	profileDatabase := postgresqlProfile.NewProfileRepoPostgresql(database)
 
-	lis, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", 123))
+	lis, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", 1337))
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
 
 	var opts []grpc.ServerOption
 	grpcServer := grpc.NewServer(opts...)
-	pb.RegisterAuthServer(grpcServer, auth.NewAuthServer(authDatabase)) // maybe make RegisterService function
+	pb.RegisterAuthServer(grpcServer, auth.NewAuthServer(authDatabase, &auth.HashImplementation{})) // maybe make RegisterService function
 	pb.RegisterProfileServer(grpcServer, profile.NewProfileServer(profileDatabase))
 
 	if err := grpcServer.Serve(lis); err != nil {

@@ -2,7 +2,7 @@ package auth
 
 import (
 	"context"
-	"log"
+	"errors"
 	model "promo/internal/userservice/models"
 	"promo/internal/userservice/proto/pb"
 	"time"
@@ -14,28 +14,30 @@ import (
 
 type authServer struct {
 	pb.UnimplementedAuthServer
-	db AuthRepo
+	db           AuthRepo
+	hashFunction Hash
 }
 
-func NewAuthServer(db AuthRepo) *authServer {
-	return &authServer{db: db}
+func NewAuthServer(db AuthRepo, hashFunction Hash) *authServer {
+	return &authServer{db: db, hashFunction: hashFunction}
 }
 
 func (a *authServer) Register(ctx context.Context, req *pb.RegisterRequest) (*pb.RegisterResponse, error) {
-	var res pb.RegisterResponse
 	if req.Login == nil || req.Password == nil || req.Email == nil {
-		// error
-		// set error everywhere
-		return &res, nil
+		return nil, errors.New("empty login or password or email")
 	}
 
-	hash, err := bcrypt.GenerateFromPassword([]byte(req.GetPassword()), 10)
+	hash, err := a.hashFunction.GenerateFromPassword([]byte(req.GetPassword()), 10)
 	if err != nil {
-		// handle error
-		return &res, nil
+		return nil, err
 	}
 
-	user := model.User{ // check for existance
+	isExist, _ := a.checkIfUserExistsByLogin(ctx, *req.Login)
+	if isExist {
+		return nil, errors.New("login already exists")
+	}
+
+	user := &model.User{
 		Login:        req.GetLogin(),
 		Password:     string(hash),
 		Name:         req.GetName(),
@@ -45,107 +47,106 @@ func (a *authServer) Register(ctx context.Context, req *pb.RegisterRequest) (*pb
 		MobileNumber: req.GetMobileNumber(),
 	}
 
-	_, err = a.db.Add(ctx, &user)
+	_, err = a.db.Add(ctx, user)
 	if err != nil {
-
-		return &res, nil
+		return nil, err
 	}
 
-	res.Status = proto.Uint64(200)
-	return &res, nil
+	return &pb.RegisterResponse{}, nil
 }
 
 func (a *authServer) Login(ctx context.Context, req *pb.LoginRequest) (*pb.LoginResponse, error) {
-	var res pb.LoginResponse
 	if req.Password == nil {
-		// error
-		return &res, nil
-	} else if req.Login == nil && req.Password == nil {
-		// error
-		return &res, nil
+		return nil, errors.New("empty password")
+	} else if req.Login == nil && req.Email == nil {
+		return nil, errors.New("empty login and email")
 	}
 
 	var user *model.User
 	var err error
+	var hashedPassword string
 	if req.Login != nil {
 		user, err = a.db.GetByLogin(ctx, req.GetLogin())
 		if err != nil {
-			// handle error
-			return &res, err
+			return nil, err
 		}
+		hashedPassword = user.Password
 	} else if req.Email != nil {
 		user, err = a.db.GetByEmail(ctx, req.GetEmail())
 		if err != nil {
-			// handle error
-			return &res, err
+			return nil, err
 		}
+		hashedPassword = user.Password
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(*req.Password)); err != nil {
+		return nil, err
 	}
 
 	jwt, err := a.generateJWT(ctx, user)
 	if err != nil {
-		// handle error
-		return &res, err
+		return nil, err
 	}
 
-	res.Status = proto.Uint64(200)
-	res.Jwt = proto.String(jwt)
-	return &res, nil
+	var response pb.LoginResponse
+	response.Jwt = proto.String(jwt)
+	return &response, nil
 }
 
 func (a *authServer) Validate(ctx context.Context, req *pb.ValidateRequest) (*pb.ValidateResponse, error) {
-	var res pb.ValidateResponse
 	if req.Jwt == nil {
-		// handle error
+		return nil, errors.New("empty jwt")
 	}
 
 	token, err := jwt.Parse(req.GetJwt(), func(token *jwt.Token) (interface{}, error) {
 		return []byte("secret_key"), nil
 	})
 	if err != nil {
-		// handle error
+		return nil, err
 	}
 
 	if !token.Valid {
-		// handle error
+		return nil, errors.New("jwt token is invalid")
 	}
 
+	login, err := token.Claims.GetSubject()
+	if err != nil {
+		return nil, err
+	}
+
+	var res pb.ValidateResponse
 	res.Valid = proto.Bool(true)
+	res.Login = proto.String(login)
 	return &res, nil
 }
 
 func (a *authServer) checkIfUserExistsById(ctx context.Context, id uint64) (bool, error) {
 	user, err := a.db.GetById(ctx, id)
 	if err != nil {
-		log.Printf("error: %v", err) // check for error
 		return false, err
 	}
 	return user == nil, err
 }
 
 func (a *authServer) checkIfUserExistsByLogin(ctx context.Context, login string) (bool, error) {
-	user, err := a.db.GetByLogin(ctx, login)
-	if err != nil {
-		log.Printf("error: %v", err) // check for error
-		return false, err
-	}
-	return user == nil, err
+	user, err := a.db.GetByLogin(ctx, login) // rewrite with exec instead of query
+	return user != nil, err
 }
 
 func (a *authServer) generateJWT(ctx context.Context, user *model.User) (string, error) {
 	secretKey := []byte("secret_key")
-
 	claims := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"sub": username,                         // Subject (user identifier)
-		"iss": "todo-app",                       // Issuer
-		"aud": getRole(username),                // Audience (user role)
+		"sub": user.Login,          // Subject (user identifier)
+		"iss": "promocode-service", // Issuer
+		// "aud": getRole(username),                // Audience (user role)
 		"exp": time.Now().Add(time.Hour).Unix(), // Expiration time
 		"iat": time.Now().Unix(),                // Issued at
 	})
 
 	jwt, err := claims.SignedString(secretKey)
 	if err != nil {
-		// handle error
+		return "", err
 	}
 
-	return jwt, err
+	return jwt, nil
 }

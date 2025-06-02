@@ -1,9 +1,9 @@
 openapi: "3.0.2"
 info:
-  title: Things API
+  title: APIGateway
   version: "1.0"
   description:
-    The Things API creates, reads, updates, lists and deletes things!
+   Apigateway
   contact:
     name: Laurence de Jong
     url: https://ldej.nl/
@@ -14,252 +14,206 @@ info:
 servers:
   - url: /api/v1
 paths:
-  /things:
-    get:
-      operationId: listThings
-      tags:
-        - thing
-      description: List things
-      parameters:
-        - name: page
-          description: Page number
-          in: query
-          schema:
-            type: integer
-        - name: keyword
-          description: Filter things by keyword
-          in: query
-          schema:
-            type: string
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ListThingsResponse"
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        default:
-          $ref: '#/components/responses/DefaultError'
+  /login:
     post:
-      security:
-        - apiKey: [thing.create]
-      operationId: createThing
+      operationId: login
       tags:
-        - thing
-      description: Create a thing
+        - userService
+      description: Login User
       requestBody:
-        description: Object containing thing creation parameters.
+        description: Login body
+        required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateThingRequest"
+              $ref: "#/components/schemas/LoginRequest"
       responses:
         '200':
           description: OK
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ThingResponse"
+                $ref: "#/components/schemas/LoginResponse"
         default:
-          $ref: '#/components/responses/DefaultError'
-  /things/{uuid}:
+          $ref: "#/components/responses/Error"
+  /register:
+    post:
+      operationId: register
+      tags:
+        - userService
+      description: Register User
+      requestBody:
+        description: Register body
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegisterResponse"
+        default:
+          $ref: "#/components/responses/Error"
+  /profile:
     get:
-      operationId: getThing
+      operationId: getProfile
       tags:
-        - thing
-      description: Get a single thing
+        - userService
+      description: Get user profile
       parameters:
-        - name: uuid
-          description: The uuid of the thing to get
-          in: path
-          required: true
+        - name: jwt
+          description: User's jwt
+          in: cookie
           schema:
             type: string
-            format: uuid
+          required: true
       responses:
         '200':
           description: OK
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ThingResponse"
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
+                $ref: "#/components/schemas/GetProfileResponse"
         default:
-          $ref: '#/components/responses/DefaultError'
-    put:
-      security:
-        - apiKey: [thing.update]
-      operationId: updateThing
+          $ref: "#/components/responses/Error"
+    post:
+      operationId: updateProfile
       tags:
-        - thing
-      description: Update a thing
+        - userService
+      description: Update user profile
       parameters:
-        - name: uuid
-          description: The uuid of the thing to get
-          in: path
-          required: true
+        - name: jwt
+          description: User's jwt
+          in: cookie
           schema:
             type: string
-            format: uuid
+          required: true
       requestBody:
-        description: Object containing thing update parameters.
+        description: User's new data
+        required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/UpdateThingRequest"
+              $ref: "#/components/schemas/UpdateProfileRequest"
       responses:
-        '204':
-          description: No content
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
+        '200':
+          description: OK
+          content:
+            text/plain:
+              schema:
+                type: boolean
         default:
-          $ref: '#/components/responses/DefaultError'
-    delete:
-      security:
-        - apiKey: [thing.delete]
-      operationId: deleteThing
-      tags:
-        - thing
-      description: Delete a thing
-      parameters:
-        - name: uuid
-          description: The uuid of the thing to get
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
-      responses:
-        '204':
-          description: No content
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        default:
-          $ref: '#/components/responses/DefaultError'
+          $ref: "#/components/responses/Error"
 components:
-  securitySchemes:
-    apiKey:
-      type: apiKey
-      name: X-Api-Key
-      in: header
   responses:
-    NotFound:
-      description: The specified resource was not found
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
-    Unauthorized:
-      description: Unauthorized
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
-    DefaultError:
-      description: Error
+    Error:
+      description: Super Error
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
   schemas:
-    ThingType:
-      type: string
-      enum:
-        - some
-        - any
-        - none
     Error:
       type: object
       properties:
         code:
           type: string
-        message:
+        message: 
           type: string
       required:
-        - code
         - message
-    ThingResponse:
+    LoginRequest:
       type: object
-      required:
-        - uuid
-        - type
-        - name
-        - rank
-        - score
-        - rating
-        - created
       properties:
-        uuid:
+        login:
           type: string
-          format: uuid
-        type:
-          $ref: '#/components/schemas/ThingType'
+          format: string
+        email:
+          type: string
+          format: string
+        password:
+          type: string
+          format: string
+      required:
+       - password
+    LoginResponse:
+      type: object
+      properties:
+        jwt:
+          type: string
+          format: string
+    RegisterRequest:
+      type: object
+      properties:
+        login:
+          type: string
+          format: string
+        email:
+          type: string
+          format: string
         name:
           type: string
-        rank:
-          type: integer
-          format: int64
-        score:
-          type: number
-          format: double
-        rating:
-          type: number
-          format: float
-        created:
+          format: string
+        surname:
           type: string
-          format: date-time
-    CreateThingRequest:
-      type: object
+          format: string
+        mobile_number:
+          type: string
+          format: string
+        password:
+          type: string
+          format: string
       required:
-        - name
-        - type
-        - rank
+       - login
+       - email
+       - password
+    RegisterResponse:
+      type: object
       properties:
+        jwt:
+          type: string
+          format: string
+    GetProfileResponse:
+      type: object
+      properties:
+        login:
+          type: string
+          format: string
+        email:
+          type: string
+          format: string
         name:
           type: string
-          maxLength: 10
-        type:
-          $ref: '#/components/schemas/ThingType'
-        rank:
-          type: integer
-          format: int64
-        score:
-          type: number
-          format: double
-        rating:
-          type: number
-          format: float
-          minimum: 0
-          maximum: 5
-    UpdateThingRequest:
+          format: string
+        surname:
+          type: string
+          format: string
+        mobile_number:
+          type: string
+          format: string
+    UpdateProfileRequest:
       type: object
-      required:
-        - score
       properties:
-        score:
-          type: number
-          format: double
-    ListThingsResponse:
-      type: object
+        password:
+          type: string
+          format: string
+        name:
+          type: string
+          format: string
+        surname:
+          type: string
+          format: string
+        mobile_number:
+          type: string
+          format: string
       required:
-        - things
-        - total
-      properties:
-        things:
-          items:
-            $ref: "#/components/schemas/ThingResponse"
-          type: array
-        total:
-          type: integer
+       - name
+       - surname
+       - mobile_number
 tags:
-  - name: thing
-    description: Endpoints interacting with things
+  - name: userService
+    description: Service which logins and registers users

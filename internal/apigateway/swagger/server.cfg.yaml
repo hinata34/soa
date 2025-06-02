@@ -1,5 +1,4 @@
 package: apigateway
-output: ./server.gen.go
 generate:
   embedded-spec: true
   strict-server: true

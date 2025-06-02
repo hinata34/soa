@@ -14,107 +14,98 @@ import (
 	"net/url"
 	"path"
 	"strings"
-	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/gin-gonic/gin"
 	"github.com/oapi-codegen/runtime"
 	strictgin "github.com/oapi-codegen/runtime/strictmiddleware/gin"
-	openapi_types "github.com/oapi-codegen/runtime/types"
 )
-
-const (
-	ApiKeyScopes = "apiKey.Scopes"
-)
-
-// Defines values for ThingType.
-const (
-	Any  ThingType = "any"
-	None ThingType = "none"
-	Some ThingType = "some"
-)
-
-// CreateThingRequest defines model for CreateThingRequest.
-type CreateThingRequest struct {
-	Name   string    `json:"name"`
-	Rank   int64     `json:"rank"`
-	Rating *float32  `json:"rating,omitempty"`
-	Score  *float64  `json:"score,omitempty"`
-	Type   ThingType `json:"type"`
-}
 
 // Error defines model for Error.
 type Error struct {
-	Code    string `json:"code"`
-	Message string `json:"message"`
+	Code    *string `json:"code,omitempty"`
+	Message string  `json:"message"`
 }
 
-// ListThingsResponse defines model for ListThingsResponse.
-type ListThingsResponse struct {
-	Things []ThingResponse `json:"things"`
-	Total  int             `json:"total"`
+// GetProfileResponse defines model for GetProfileResponse.
+type GetProfileResponse struct {
+	Email        *string `json:"email,omitempty"`
+	Login        *string `json:"login,omitempty"`
+	MobileNumber *string `json:"mobile_number,omitempty"`
+	Name         *string `json:"name,omitempty"`
+	Surname      *string `json:"surname,omitempty"`
 }
 
-// ThingResponse defines model for ThingResponse.
-type ThingResponse struct {
-	Created time.Time          `json:"created"`
-	Name    string             `json:"name"`
-	Rank    int64              `json:"rank"`
-	Rating  float32            `json:"rating"`
-	Score   float64            `json:"score"`
-	Type    ThingType          `json:"type"`
-	Uuid    openapi_types.UUID `json:"uuid"`
+// LoginRequest defines model for LoginRequest.
+type LoginRequest struct {
+	Email    *string `json:"email,omitempty"`
+	Login    *string `json:"login,omitempty"`
+	Password string  `json:"password"`
 }
 
-// ThingType defines model for ThingType.
-type ThingType string
-
-// UpdateThingRequest defines model for UpdateThingRequest.
-type UpdateThingRequest struct {
-	Score float64 `json:"score"`
+// LoginResponse defines model for LoginResponse.
+type LoginResponse struct {
+	Jwt *string `json:"jwt,omitempty"`
 }
 
-// DefaultError defines model for DefaultError.
-type DefaultError = Error
-
-// NotFound defines model for NotFound.
-type NotFound = Error
-
-// Unauthorized defines model for Unauthorized.
-type Unauthorized = Error
-
-// ListThingsParams defines parameters for ListThings.
-type ListThingsParams struct {
-	// Page Page number
-	Page *int `form:"page,omitempty" json:"page,omitempty"`
-
-	// Keyword Filter things by keyword
-	Keyword *string `form:"keyword,omitempty" json:"keyword,omitempty"`
+// RegisterRequest defines model for RegisterRequest.
+type RegisterRequest struct {
+	Email        string  `json:"email"`
+	Login        string  `json:"login"`
+	MobileNumber *string `json:"mobile_number,omitempty"`
+	Name         *string `json:"name,omitempty"`
+	Password     string  `json:"password"`
+	Surname      *string `json:"surname,omitempty"`
 }
 
-// CreateThingJSONRequestBody defines body for CreateThing for application/json ContentType.
-type CreateThingJSONRequestBody = CreateThingRequest
+// RegisterResponse defines model for RegisterResponse.
+type RegisterResponse struct {
+	Jwt *string `json:"jwt,omitempty"`
+}
 
-// UpdateThingJSONRequestBody defines body for UpdateThing for application/json ContentType.
-type UpdateThingJSONRequestBody = UpdateThingRequest
+// UpdateProfileRequest defines model for UpdateProfileRequest.
+type UpdateProfileRequest struct {
+	MobileNumber string  `json:"mobile_number"`
+	Name         string  `json:"name"`
+	Password     *string `json:"password,omitempty"`
+	Surname      string  `json:"surname"`
+}
+
+// GetProfileParams defines parameters for GetProfile.
+type GetProfileParams struct {
+	// Jwt User's jwt
+	Jwt string `form:"jwt" json:"jwt"`
+}
+
+// UpdateProfileParams defines parameters for UpdateProfile.
+type UpdateProfileParams struct {
+	// Jwt User's jwt
+	Jwt string `form:"jwt" json:"jwt"`
+}
+
+// LoginJSONRequestBody defines body for Login for application/json ContentType.
+type LoginJSONRequestBody = LoginRequest
+
+// UpdateProfileJSONRequestBody defines body for UpdateProfile for application/json ContentType.
+type UpdateProfileJSONRequestBody = UpdateProfileRequest
+
+// RegisterJSONRequestBody defines body for Register for application/json ContentType.
+type RegisterJSONRequestBody = RegisterRequest
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 
-	// (GET /things)
-	ListThings(c *gin.Context, params ListThingsParams)
+	// (POST /login)
+	Login(c *gin.Context)
 
-	// (POST /things)
-	CreateThing(c *gin.Context)
+	// (GET /profile)
+	GetProfile(c *gin.Context, params GetProfileParams)
 
-	// (DELETE /things/{uuid})
-	DeleteThing(c *gin.Context, uuid openapi_types.UUID)
+	// (POST /profile)
+	UpdateProfile(c *gin.Context, params UpdateProfileParams)
 
-	// (GET /things/{uuid})
-	GetThing(c *gin.Context, uuid openapi_types.UUID)
-
-	// (PUT /things/{uuid})
-	UpdateThing(c *gin.Context, uuid openapi_types.UUID)
+	// (POST /register)
+	Register(c *gin.Context)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -126,28 +117,43 @@ type ServerInterfaceWrapper struct {
 
 type MiddlewareFunc func(c *gin.Context)
 
-// ListThings operation middleware
-func (siw *ServerInterfaceWrapper) ListThings(c *gin.Context) {
+// Login operation middleware
+func (siw *ServerInterfaceWrapper) Login(c *gin.Context) {
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		middleware(c)
+		if c.IsAborted() {
+			return
+		}
+	}
+
+	siw.Handler.Login(c)
+}
+
+// GetProfile operation middleware
+func (siw *ServerInterfaceWrapper) GetProfile(c *gin.Context) {
 
 	var err error
 
 	// Parameter object where we will unmarshal all parameters from the context
-	var params ListThingsParams
+	var params GetProfileParams
 
-	// ------------- Optional query parameter "page" -------------
+	{
+		var cookie string
 
-	err = runtime.BindQueryParameter("form", true, false, "page", c.Request.URL.Query(), &params.Page)
-	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter page: %w", err), http.StatusBadRequest)
-		return
-	}
+		if cookie, err = c.Cookie("jwt"); err == nil {
+			var value string
+			err = runtime.BindStyledParameter("simple", true, "jwt", cookie, &value)
+			if err != nil {
+				siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter jwt: %w", err), http.StatusBadRequest)
+				return
+			}
+			params.Jwt = value
 
-	// ------------- Optional query parameter "keyword" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "keyword", c.Request.URL.Query(), &params.Keyword)
-	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter keyword: %w", err), http.StatusBadRequest)
-		return
+		} else {
+			siw.ErrorHandler(c, fmt.Errorf("Query argument jwt is required, but not found"), http.StatusBadRequest)
+			return
+		}
 	}
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -157,39 +163,34 @@ func (siw *ServerInterfaceWrapper) ListThings(c *gin.Context) {
 		}
 	}
 
-	siw.Handler.ListThings(c, params)
+	siw.Handler.GetProfile(c, params)
 }
 
-// CreateThing operation middleware
-func (siw *ServerInterfaceWrapper) CreateThing(c *gin.Context) {
-
-	c.Set(ApiKeyScopes, []string{"thing.create"})
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		middleware(c)
-		if c.IsAborted() {
-			return
-		}
-	}
-
-	siw.Handler.CreateThing(c)
-}
-
-// DeleteThing operation middleware
-func (siw *ServerInterfaceWrapper) DeleteThing(c *gin.Context) {
+// UpdateProfile operation middleware
+func (siw *ServerInterfaceWrapper) UpdateProfile(c *gin.Context) {
 
 	var err error
 
-	// ------------- Path parameter "uuid" -------------
-	var uuid openapi_types.UUID
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateProfileParams
 
-	err = runtime.BindStyledParameter("simple", false, "uuid", c.Param("uuid"), &uuid)
-	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter uuid: %w", err), http.StatusBadRequest)
-		return
+	{
+		var cookie string
+
+		if cookie, err = c.Cookie("jwt"); err == nil {
+			var value string
+			err = runtime.BindStyledParameter("simple", true, "jwt", cookie, &value)
+			if err != nil {
+				siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter jwt: %w", err), http.StatusBadRequest)
+				return
+			}
+			params.Jwt = value
+
+		} else {
+			siw.ErrorHandler(c, fmt.Errorf("Query argument jwt is required, but not found"), http.StatusBadRequest)
+			return
+		}
 	}
-
-	c.Set(ApiKeyScopes, []string{"thing.delete"})
 
 	for _, middleware := range siw.HandlerMiddlewares {
 		middleware(c)
@@ -198,22 +199,11 @@ func (siw *ServerInterfaceWrapper) DeleteThing(c *gin.Context) {
 		}
 	}
 
-	siw.Handler.DeleteThing(c, uuid)
+	siw.Handler.UpdateProfile(c, params)
 }
 
-// GetThing operation middleware
-func (siw *ServerInterfaceWrapper) GetThing(c *gin.Context) {
-
-	var err error
-
-	// ------------- Path parameter "uuid" -------------
-	var uuid openapi_types.UUID
-
-	err = runtime.BindStyledParameter("simple", false, "uuid", c.Param("uuid"), &uuid)
-	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter uuid: %w", err), http.StatusBadRequest)
-		return
-	}
+// Register operation middleware
+func (siw *ServerInterfaceWrapper) Register(c *gin.Context) {
 
 	for _, middleware := range siw.HandlerMiddlewares {
 		middleware(c)
@@ -222,33 +212,7 @@ func (siw *ServerInterfaceWrapper) GetThing(c *gin.Context) {
 		}
 	}
 
-	siw.Handler.GetThing(c, uuid)
-}
-
-// UpdateThing operation middleware
-func (siw *ServerInterfaceWrapper) UpdateThing(c *gin.Context) {
-
-	var err error
-
-	// ------------- Path parameter "uuid" -------------
-	var uuid openapi_types.UUID
-
-	err = runtime.BindStyledParameter("simple", false, "uuid", c.Param("uuid"), &uuid)
-	if err != nil {
-		siw.ErrorHandler(c, fmt.Errorf("Invalid format for parameter uuid: %w", err), http.StatusBadRequest)
-		return
-	}
-
-	c.Set(ApiKeyScopes, []string{"thing.update"})
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		middleware(c)
-		if c.IsAborted() {
-			return
-		}
-	}
-
-	siw.Handler.UpdateThing(c, uuid)
+	siw.Handler.Register(c)
 }
 
 // GinServerOptions provides options for the Gin server.
@@ -278,220 +242,126 @@ func RegisterHandlersWithOptions(router gin.IRouter, si ServerInterface, options
 		ErrorHandler:       errorHandler,
 	}
 
-	router.GET(options.BaseURL+"/things", wrapper.ListThings)
-	router.POST(options.BaseURL+"/things", wrapper.CreateThing)
-	router.DELETE(options.BaseURL+"/things/:uuid", wrapper.DeleteThing)
-	router.GET(options.BaseURL+"/things/:uuid", wrapper.GetThing)
-	router.PUT(options.BaseURL+"/things/:uuid", wrapper.UpdateThing)
+	router.POST(options.BaseURL+"/login", wrapper.Login)
+	router.GET(options.BaseURL+"/profile", wrapper.GetProfile)
+	router.POST(options.BaseURL+"/profile", wrapper.UpdateProfile)
+	router.POST(options.BaseURL+"/register", wrapper.Register)
 }
 
-type DefaultErrorJSONResponse Error
+type ErrorJSONResponse Error
 
-type NotFoundJSONResponse Error
-
-type UnauthorizedJSONResponse Error
-
-type ListThingsRequestObject struct {
-	Params ListThingsParams
+type LoginRequestObject struct {
+	Body *LoginJSONRequestBody
 }
 
-type ListThingsResponseObject interface {
-	VisitListThingsResponse(w http.ResponseWriter) error
+type LoginResponseObject interface {
+	VisitLoginResponse(w http.ResponseWriter) error
 }
 
-type ListThings200JSONResponse ListThingsResponse
+type Login200JSONResponse LoginResponse
 
-func (response ListThings200JSONResponse) VisitListThingsResponse(w http.ResponseWriter) error {
+func (response Login200JSONResponse) VisitLoginResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type ListThings401JSONResponse struct{ UnauthorizedJSONResponse }
-
-func (response ListThings401JSONResponse) VisitListThingsResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(401)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type ListThingsdefaultJSONResponse struct {
+type LogindefaultJSONResponse struct {
 	Body       Error
 	StatusCode int
 }
 
-func (response ListThingsdefaultJSONResponse) VisitListThingsResponse(w http.ResponseWriter) error {
+func (response LogindefaultJSONResponse) VisitLoginResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(response.StatusCode)
 
 	return json.NewEncoder(w).Encode(response.Body)
 }
 
-type CreateThingRequestObject struct {
-	Body *CreateThingJSONRequestBody
+type GetProfileRequestObject struct {
+	Params GetProfileParams
 }
 
-type CreateThingResponseObject interface {
-	VisitCreateThingResponse(w http.ResponseWriter) error
+type GetProfileResponseObject interface {
+	VisitGetProfileResponse(w http.ResponseWriter) error
 }
 
-type CreateThing200JSONResponse ThingResponse
+type GetProfile200JSONResponse GetProfileResponse
 
-func (response CreateThing200JSONResponse) VisitCreateThingResponse(w http.ResponseWriter) error {
+func (response GetProfile200JSONResponse) VisitGetProfileResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type CreateThingdefaultJSONResponse struct {
+type GetProfiledefaultJSONResponse struct {
 	Body       Error
 	StatusCode int
 }
 
-func (response CreateThingdefaultJSONResponse) VisitCreateThingResponse(w http.ResponseWriter) error {
+func (response GetProfiledefaultJSONResponse) VisitGetProfileResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(response.StatusCode)
 
 	return json.NewEncoder(w).Encode(response.Body)
 }
 
-type DeleteThingRequestObject struct {
-	Uuid openapi_types.UUID `json:"uuid"`
+type UpdateProfileRequestObject struct {
+	Params UpdateProfileParams
+	Body   *UpdateProfileJSONRequestBody
 }
 
-type DeleteThingResponseObject interface {
-	VisitDeleteThingResponse(w http.ResponseWriter) error
+type UpdateProfileResponseObject interface {
+	VisitUpdateProfileResponse(w http.ResponseWriter) error
 }
 
-type DeleteThing204Response struct {
+type UpdateProfile200TextResponse string
+
+func (response UpdateProfile200TextResponse) VisitUpdateProfileResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "text/plain")
+	w.WriteHeader(200)
+
+	_, err := w.Write([]byte(response))
+	return err
 }
 
-func (response DeleteThing204Response) VisitDeleteThingResponse(w http.ResponseWriter) error {
-	w.WriteHeader(204)
-	return nil
-}
-
-type DeleteThing401JSONResponse struct{ UnauthorizedJSONResponse }
-
-func (response DeleteThing401JSONResponse) VisitDeleteThingResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(401)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type DeleteThing404JSONResponse struct{ NotFoundJSONResponse }
-
-func (response DeleteThing404JSONResponse) VisitDeleteThingResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(404)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type DeleteThingdefaultJSONResponse struct {
+type UpdateProfiledefaultJSONResponse struct {
 	Body       Error
 	StatusCode int
 }
 
-func (response DeleteThingdefaultJSONResponse) VisitDeleteThingResponse(w http.ResponseWriter) error {
+func (response UpdateProfiledefaultJSONResponse) VisitUpdateProfileResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(response.StatusCode)
 
 	return json.NewEncoder(w).Encode(response.Body)
 }
 
-type GetThingRequestObject struct {
-	Uuid openapi_types.UUID `json:"uuid"`
+type RegisterRequestObject struct {
+	Body *RegisterJSONRequestBody
 }
 
-type GetThingResponseObject interface {
-	VisitGetThingResponse(w http.ResponseWriter) error
+type RegisterResponseObject interface {
+	VisitRegisterResponse(w http.ResponseWriter) error
 }
 
-type GetThing200JSONResponse ThingResponse
+type Register200JSONResponse RegisterResponse
 
-func (response GetThing200JSONResponse) VisitGetThingResponse(w http.ResponseWriter) error {
+func (response Register200JSONResponse) VisitRegisterResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type GetThing401JSONResponse struct{ UnauthorizedJSONResponse }
-
-func (response GetThing401JSONResponse) VisitGetThingResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(401)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type GetThing404JSONResponse struct{ NotFoundJSONResponse }
-
-func (response GetThing404JSONResponse) VisitGetThingResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(404)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type GetThingdefaultJSONResponse struct {
+type RegisterdefaultJSONResponse struct {
 	Body       Error
 	StatusCode int
 }
 
-func (response GetThingdefaultJSONResponse) VisitGetThingResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(response.StatusCode)
-
-	return json.NewEncoder(w).Encode(response.Body)
-}
-
-type UpdateThingRequestObject struct {
-	Uuid openapi_types.UUID `json:"uuid"`
-	Body *UpdateThingJSONRequestBody
-}
-
-type UpdateThingResponseObject interface {
-	VisitUpdateThingResponse(w http.ResponseWriter) error
-}
-
-type UpdateThing204Response struct {
-}
-
-func (response UpdateThing204Response) VisitUpdateThingResponse(w http.ResponseWriter) error {
-	w.WriteHeader(204)
-	return nil
-}
-
-type UpdateThing401JSONResponse struct{ UnauthorizedJSONResponse }
-
-func (response UpdateThing401JSONResponse) VisitUpdateThingResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(401)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type UpdateThing404JSONResponse struct{ NotFoundJSONResponse }
-
-func (response UpdateThing404JSONResponse) VisitUpdateThingResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(404)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type UpdateThingdefaultJSONResponse struct {
-	Body       Error
-	StatusCode int
-}
-
-func (response UpdateThingdefaultJSONResponse) VisitUpdateThingResponse(w http.ResponseWriter) error {
+func (response RegisterdefaultJSONResponse) VisitRegisterResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(response.StatusCode)
 
@@ -501,20 +371,17 @@ func (response UpdateThingdefaultJSONResponse) VisitUpdateThingResponse(w http.R
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 
-	// (GET /things)
-	ListThings(ctx context.Context, request ListThingsRequestObject) (ListThingsResponseObject, error)
+	// (POST /login)
+	Login(ctx context.Context, request LoginRequestObject) (LoginResponseObject, error)
 
-	// (POST /things)
-	CreateThing(ctx context.Context, request CreateThingRequestObject) (CreateThingResponseObject, error)
+	// (GET /profile)
+	GetProfile(ctx context.Context, request GetProfileRequestObject) (GetProfileResponseObject, error)
 
-	// (DELETE /things/{uuid})
-	DeleteThing(ctx context.Context, request DeleteThingRequestObject) (DeleteThingResponseObject, error)
+	// (POST /profile)
+	UpdateProfile(ctx context.Context, request UpdateProfileRequestObject) (UpdateProfileResponseObject, error)
 
-	// (GET /things/{uuid})
-	GetThing(ctx context.Context, request GetThingRequestObject) (GetThingResponseObject, error)
-
-	// (PUT /things/{uuid})
-	UpdateThing(ctx context.Context, request UpdateThingRequestObject) (UpdateThingResponseObject, error)
+	// (POST /register)
+	Register(ctx context.Context, request RegisterRequestObject) (RegisterResponseObject, error)
 }
 
 type StrictHandlerFunc = strictgin.StrictGinHandlerFunc
@@ -529,17 +396,50 @@ type strictHandler struct {
 	middlewares []StrictMiddlewareFunc
 }
 
-// ListThings operation middleware
-func (sh *strictHandler) ListThings(ctx *gin.Context, params ListThingsParams) {
-	var request ListThingsRequestObject
+// Login operation middleware
+func (sh *strictHandler) Login(ctx *gin.Context) {
+	var request LoginRequestObject
+
+	var body LoginJSONRequestBody
+	if err := ctx.ShouldBind(&body); err != nil {
+		ctx.Status(http.StatusBadRequest)
+		ctx.Error(err)
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.Login(ctx, request.(LoginRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "Login")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		ctx.Error(err)
+		ctx.Status(http.StatusInternalServerError)
+	} else if validResponse, ok := response.(LoginResponseObject); ok {
+		if err := validResponse.VisitLoginResponse(ctx.Writer); err != nil {
+			ctx.Error(err)
+		}
+	} else if response != nil {
+		ctx.Error(fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetProfile operation middleware
+func (sh *strictHandler) GetProfile(ctx *gin.Context, params GetProfileParams) {
+	var request GetProfileRequestObject
 
 	request.Params = params
 
 	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
-		return sh.ssi.ListThings(ctx, request.(ListThingsRequestObject))
+		return sh.ssi.GetProfile(ctx, request.(GetProfileRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "ListThings")
+		handler = middleware(handler, "GetProfile")
 	}
 
 	response, err := handler(ctx, request)
@@ -547,8 +447,8 @@ func (sh *strictHandler) ListThings(ctx *gin.Context, params ListThingsParams) {
 	if err != nil {
 		ctx.Error(err)
 		ctx.Status(http.StatusInternalServerError)
-	} else if validResponse, ok := response.(ListThingsResponseObject); ok {
-		if err := validResponse.VisitListThingsResponse(ctx.Writer); err != nil {
+	} else if validResponse, ok := response.(GetProfileResponseObject); ok {
+		if err := validResponse.VisitGetProfileResponse(ctx.Writer); err != nil {
 			ctx.Error(err)
 		}
 	} else if response != nil {
@@ -556,11 +456,13 @@ func (sh *strictHandler) ListThings(ctx *gin.Context, params ListThingsParams) {
 	}
 }
 
-// CreateThing operation middleware
-func (sh *strictHandler) CreateThing(ctx *gin.Context) {
-	var request CreateThingRequestObject
+// UpdateProfile operation middleware
+func (sh *strictHandler) UpdateProfile(ctx *gin.Context, params UpdateProfileParams) {
+	var request UpdateProfileRequestObject
 
-	var body CreateThingJSONRequestBody
+	request.Params = params
+
+	var body UpdateProfileJSONRequestBody
 	if err := ctx.ShouldBind(&body); err != nil {
 		ctx.Status(http.StatusBadRequest)
 		ctx.Error(err)
@@ -569,10 +471,10 @@ func (sh *strictHandler) CreateThing(ctx *gin.Context) {
 	request.Body = &body
 
 	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
-		return sh.ssi.CreateThing(ctx, request.(CreateThingRequestObject))
+		return sh.ssi.UpdateProfile(ctx, request.(UpdateProfileRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "CreateThing")
+		handler = middleware(handler, "UpdateProfile")
 	}
 
 	response, err := handler(ctx, request)
@@ -580,8 +482,8 @@ func (sh *strictHandler) CreateThing(ctx *gin.Context) {
 	if err != nil {
 		ctx.Error(err)
 		ctx.Status(http.StatusInternalServerError)
-	} else if validResponse, ok := response.(CreateThingResponseObject); ok {
-		if err := validResponse.VisitCreateThingResponse(ctx.Writer); err != nil {
+	} else if validResponse, ok := response.(UpdateProfileResponseObject); ok {
+		if err := validResponse.VisitUpdateProfileResponse(ctx.Writer); err != nil {
 			ctx.Error(err)
 		}
 	} else if response != nil {
@@ -589,67 +491,11 @@ func (sh *strictHandler) CreateThing(ctx *gin.Context) {
 	}
 }
 
-// DeleteThing operation middleware
-func (sh *strictHandler) DeleteThing(ctx *gin.Context, uuid openapi_types.UUID) {
-	var request DeleteThingRequestObject
+// Register operation middleware
+func (sh *strictHandler) Register(ctx *gin.Context) {
+	var request RegisterRequestObject
 
-	request.Uuid = uuid
-
-	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
-		return sh.ssi.DeleteThing(ctx, request.(DeleteThingRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "DeleteThing")
-	}
-
-	response, err := handler(ctx, request)
-
-	if err != nil {
-		ctx.Error(err)
-		ctx.Status(http.StatusInternalServerError)
-	} else if validResponse, ok := response.(DeleteThingResponseObject); ok {
-		if err := validResponse.VisitDeleteThingResponse(ctx.Writer); err != nil {
-			ctx.Error(err)
-		}
-	} else if response != nil {
-		ctx.Error(fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
-// GetThing operation middleware
-func (sh *strictHandler) GetThing(ctx *gin.Context, uuid openapi_types.UUID) {
-	var request GetThingRequestObject
-
-	request.Uuid = uuid
-
-	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
-		return sh.ssi.GetThing(ctx, request.(GetThingRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "GetThing")
-	}
-
-	response, err := handler(ctx, request)
-
-	if err != nil {
-		ctx.Error(err)
-		ctx.Status(http.StatusInternalServerError)
-	} else if validResponse, ok := response.(GetThingResponseObject); ok {
-		if err := validResponse.VisitGetThingResponse(ctx.Writer); err != nil {
-			ctx.Error(err)
-		}
-	} else if response != nil {
-		ctx.Error(fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
-// UpdateThing operation middleware
-func (sh *strictHandler) UpdateThing(ctx *gin.Context, uuid openapi_types.UUID) {
-	var request UpdateThingRequestObject
-
-	request.Uuid = uuid
-
-	var body UpdateThingJSONRequestBody
+	var body RegisterJSONRequestBody
 	if err := ctx.ShouldBind(&body); err != nil {
 		ctx.Status(http.StatusBadRequest)
 		ctx.Error(err)
@@ -658,10 +504,10 @@ func (sh *strictHandler) UpdateThing(ctx *gin.Context, uuid openapi_types.UUID) 
 	request.Body = &body
 
 	handler := func(ctx *gin.Context, request interface{}) (interface{}, error) {
-		return sh.ssi.UpdateThing(ctx, request.(UpdateThingRequestObject))
+		return sh.ssi.Register(ctx, request.(RegisterRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "UpdateThing")
+		handler = middleware(handler, "Register")
 	}
 
 	response, err := handler(ctx, request)
@@ -669,8 +515,8 @@ func (sh *strictHandler) UpdateThing(ctx *gin.Context, uuid openapi_types.UUID) 
 	if err != nil {
 		ctx.Error(err)
 		ctx.Status(http.StatusInternalServerError)
-	} else if validResponse, ok := response.(UpdateThingResponseObject); ok {
-		if err := validResponse.VisitUpdateThingResponse(ctx.Writer); err != nil {
+	} else if validResponse, ok := response.(RegisterResponseObject); ok {
+		if err := validResponse.VisitRegisterResponse(ctx.Writer); err != nil {
 			ctx.Error(err)
 		}
 	} else if response != nil {
@@ -681,25 +527,19 @@ func (sh *strictHandler) UpdateThing(ctx *gin.Context, uuid openapi_types.UUID) 
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"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",
+	"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",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

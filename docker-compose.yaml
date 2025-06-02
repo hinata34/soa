@@ -7,3 +7,15 @@ services:
       POSTGRES_PASSWORD: test
     ports:
       - "5432:5432"
+  apigateway:
+    build: 
+      context: .
+      dockerfile: ./internal/apigateway/docker/Dockerfile
+    ports:
+      - "8080:8080"
+  userservice:
+    build: 
+      context: .
+      dockerfile: ./internal/userservice/docker/Dockerfile
+    ports:
+      - "1337:1337"
